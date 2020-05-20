@@ -89,7 +89,8 @@ class GLES2CmdBindStates : public GFXCmd {
   GLES2DepthBounds depthBounds;
   GLES2StencilWriteMask stencilWriteMask;
   GLES2StencilCompareMask stencilCompareMask;
-  
+  bool viewportDirty = false;
+  bool scissorDirty = false;
   GLES2CmdBindStates() : GFXCmd(GFXCmdType::BIND_STATES) {}
   
   void clear() {

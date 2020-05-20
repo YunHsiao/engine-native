@@ -49,7 +49,9 @@ class CC_GLES3_API GLES3CommandBuffer : public GFXCommandBuffer {
   GLES3GPUBindingLayout* _curGPUBlendLayout = nullptr;
   GLES3GPUInputAssembler* _curGPUInputAssember = nullptr;
   GFXViewport _curViewport;
+    bool _isViewportDirty = false;
   GFXRect _curScissor;
+    bool _isScissorDirty = false;
   float _curLineWidth = 1.0f;
   GLES3DepthBias _curDepthBias;
   GFXColor _curBlendConstants;

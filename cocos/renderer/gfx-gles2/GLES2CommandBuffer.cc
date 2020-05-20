@@ -100,26 +100,21 @@ void GLES2CommandBuffer::bindInputAssembler(GFXInputAssembler* ia) {
 }
 
 void GLES2CommandBuffer::setViewport(const GFXViewport& vp) {
-  
-  if ((_curViewport.left != vp.left) ||
-      (_curViewport.top != vp.top) ||
-      (_curViewport.width != vp.width) ||
-      (_curViewport.height != vp.height) ||
-      math::IsNotEqualF(_curViewport.minDepth, vp.minDepth) ||
-      math::IsNotEqualF(_curViewport.maxDepth, vp.maxDepth)) {
+  if (_curViewport == vp)
+      return;
+
     _curViewport = vp;
     _isStateInvalid = true;
-  }
+    _isViewportDirty = true;
 }
 
 void GLES2CommandBuffer::setScissor(const GFXRect& rect) {
-  if ((_curScissor.x != rect.x) ||
-      (_curScissor.y != rect.y) ||
-      (_curScissor.width != rect.width) ||
-      (_curScissor.height != rect.height)) {
+  if (_curScissor == rect)
+      return;
+    
     _curScissor = rect;
     _isStateInvalid = true;
-  }
+    _isScissorDirty = true;
 }
 
 void GLES2CommandBuffer::setLineWidth(const float width) {
@@ -309,7 +304,9 @@ void GLES2CommandBuffer::BindStates() {
   cmd->gpuBindingLayout = _curGPUBlendLayout;
   cmd->gpuInputAssembler = _curGPUInputAssember;
   cmd->viewport = _curViewport;
+  cmd->viewportDirty = _isViewportDirty;
   cmd->scissor = _curScissor;
+  cmd->scissorDirty = _isScissorDirty;
   cmd->lineWidth = _curLineWidth;
   cmd->depthBias = _curDepthBias;
   cmd->blendConstants.r = _curBlendConstants.r;
@@ -323,6 +320,8 @@ void GLES2CommandBuffer::BindStates() {
   _cmdPackage->bindStatesCmds.push(cmd);
   _cmdPackage->cmds.push(GFXCmdType::BIND_STATES);
   _isStateInvalid = false;
+  _isViewportDirty = false;
+  _isScissorDirty = false;
 }
 
 NS_CC_END

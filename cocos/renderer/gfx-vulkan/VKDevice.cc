@@ -60,6 +60,8 @@ bool CCVKDevice::initialize(const GFXDeviceInfo& info)
         destroy();
         return false;
     }
+    _colorFmt = _context->getColorFormat();
+    _depthStencilFmt = _context->getDepthStencilFormat();
     const CCVKGPUContext* context = ((CCVKContext*)_context)->gpuContext();
     const VkPhysicalDeviceFeatures &deviceFeatures = context->physicalDeviceFeatures;
 

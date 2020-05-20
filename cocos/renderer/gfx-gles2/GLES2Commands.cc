@@ -1395,6 +1395,17 @@ void GLES2CmdFuncExecuteCmds(GLES2Device* device, GLES2CmdPackage* cmd_package) 
         GLES2CmdBindStates* cmd = cmd_package->bindStatesCmds[cmd_idx];
         is_shader_changed = false;
           
+          if(cmd->viewportDirty)
+          {
+              glViewport(cmd->viewport.left, cmd->viewport.top, cmd->viewport.width, cmd->viewport.height);
+              cache->viewport = cmd->viewport;
+          }
+          if(cmd->scissorDirty)
+          {
+              glScissor(cmd->scissor.x, cmd->scissor.y, cmd->scissor.width, cmd->scissor.height);
+              cache->scissor = cmd->scissor;
+          }
+          
         if (cmd->gpuPipelineState) {
           gpuPipelineState = cmd->gpuPipelineState;
           glPrimitive = gpuPipelineState->glPrimitive;

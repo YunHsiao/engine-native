@@ -62,8 +62,8 @@ class CC_CORE_API GFXDevice : public Object {
   CC_INLINE int getStencilBits() const { return _stencilBits; }
   CC_INLINE uint getShaderIdGen() { return _shaderIdGen++; }
   CC_INLINE bool getReverseCW() const { return _reverseCW; }
-  GFXFormat getColorFormat() const;
-  GFXFormat getDepthStencilFormat() const;
+  CC_INLINE GFXFormat getColorFormat() const { return _colorFmt; };
+  CC_INLINE GFXFormat getDepthStencilFormat() const { return _depthStencilFmt; };
   CC_INLINE bool hasFeature(GFXFeature feature) const { return _features[static_cast<uint8_t>(feature)]; }
   CC_INLINE void defineMacro(const String& macro, const String& value) { _macros[macro] = value; }
   CC_INLINE void setReverseCW(bool reverseCW) { _reverseCW = reverseCW; }
@@ -104,6 +104,8 @@ protected:
     bool _reverseCW = false;
     uint _shaderIdGen = 0;
     std::unordered_map<String, String> _macros;
+    GFXFormat _colorFmt = GFXFormat::UNKNOWN;
+    GFXFormat _depthStencilFmt = GFXFormat::UNKNOWN;
     float _minClipZ = -1.0f;
     float _projectionSignY = 1.0f;
 };

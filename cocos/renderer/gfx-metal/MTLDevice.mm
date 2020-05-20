@@ -16,8 +16,10 @@
 #include "MTLTexture.h"
 #include "MTLTextureView.h"
 #include "MTLSampler.h"
-#import <MetalKit/MTKView.h>
 #include "MTLUtils.h"
+#include <platform/mac/CCView.h>
+#import <MetalKit/MTKView.h>
+
 
 NS_CC_BEGIN
 
@@ -38,7 +40,7 @@ bool CCMTLDevice::initialize(const GFXDeviceInfo& info)
     
     _mtkView = (MTKView*)_windowHandle;
     _mtlDevice = ((MTKView*)_mtkView).device;
-    
+        
     GFXWindowInfo window_info;
     window_info.isOffscreen = false;
     _window = createWindow(window_info);
@@ -51,7 +53,8 @@ bool CCMTLDevice::initialize(const GFXDeviceInfo& info)
     _cmdAllocator = createCommandAllocator(cmd_alloc_info);
     
     _minClipZ = 0;
-    
+    _colorFmt = GFXFormat::BGRA8;
+    _depthStencilFmt = GFXFormat::D24S8;
     _depthBits = 24;
     _stencilBits = 8;
     //TODO: other information
@@ -63,6 +66,8 @@ bool CCMTLDevice::initialize(const GFXDeviceInfo& info)
     _maxSamplerUnits = mu::getMaxEntriesInSamplerStateArgumentTable(gpuFamily);
     _maxTextureSize = mu::getMaxTexture2DWidthHeight(gpuFamily);
     _maxCubeMapTextureSize = mu::getMaxCubeMapTextureWidthHeight(gpuFamily);
+    _maxColorRenderTargets = mu::getMaxColorRenderTarget(gpuFamily);
+    _icbSuppored = mu::isIndirectCommandBufferSupported(MTLFeatureSet(_mtlFeatureSet));
     if([id<MTLDevice>(_mtlDevice) isDepth24Stencil8PixelFormatSupported])
     {
         _depthBits = 24;
@@ -285,6 +290,38 @@ GFXPipelineLayout* CCMTLDevice::createPipelineLayout(const GFXPipelineLayoutInfo
 void CCMTLDevice::copyBuffersToTexture(const GFXDataArray& buffers, GFXTexture* dst, const GFXBufferTextureCopyList& regions)
 {
     static_cast<CCMTLTexture*>(dst)->update(buffers.datas.data(), regions);
+}
+
+void CCMTLDevice::blitBuffer(void* srcData, uint offset, uint size, void* dstBuffer)
+{
+    id<MTLBuffer> sourceBuffer = id<MTLBuffer>(_blitedBuffer);
+    if(sourceBuffer == nil || sourceBuffer.allocatedSize < size)
+    {
+        if(sourceBuffer)
+            [sourceBuffer release];
+        sourceBuffer = [id<MTLDevice>(_mtlDevice) newBufferWithBytes:srcData
+                                                              length:size
+                                                             options:MTLResourceStorageModeShared];
+    }
+    
+    // Create a command buffer for GPU work.
+    id <MTLCommandBuffer> commandBuffer = [static_cast<View*>(_mtkView).mtlCommandQueue commandBuffer];
+    
+    
+    // Encode a blit pass to copy data from the source buffer to the private buffer.
+    id <MTLBlitCommandEncoder> blitCommandEncoder = [commandBuffer blitCommandEncoder];
+    [blitCommandEncoder copyFromBuffer:sourceBuffer
+                          sourceOffset:0
+                              toBuffer:id<MTLBuffer>(dstBuffer)
+                     destinationOffset:offset
+                                  size:size];
+    [blitCommandEncoder endEncoding];
+
+    // Add a completion handler and commit the command buffer.
+    [commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+        // Private buffer is populated.
+    }];
+    [commandBuffer commit];
 }
 
 NS_CC_END

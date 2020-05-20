@@ -1,22 +1,13 @@
 #include "MTLStd.h"
 #include "MTLBuffer.h"
 #include "MTLDevice.h"
+#include "MTLUtils.h"
 #import <Metal/Metal.h>
 
 NS_CC_BEGIN
-
-namespace
-{
-    //FIXME: not sure if it is correct to map like this
-    MTLResourceOptions toMTLResourseOption(GFXMemoryUsage usage)
-    {
-        if (usage == GFXMemoryUsage::DEVICE)
-            return MTLResourceStorageModePrivate;
-        else
-            return MTLResourceStorageModeShared;
-    }
+namespace {
+#define MINIMUMR_REQUIRED_SIZE_4KB 4096
 }
-
 CCMTLBuffer::CCMTLBuffer(GFXDevice* device) : GFXBuffer(device) {}
 
 CCMTLBuffer::~CCMTLBuffer()
@@ -58,12 +49,17 @@ bool CCMTLBuffer::initialize(const GFXBufferInfo& info)
     }
     
     if (_usage & GFXBufferUsage::VERTEX ||
-        _usage & GFXBufferUsage::INDEX ||
         _usage & GFXBufferUsage::UNIFORM)
     {
-        _mtlResourceOptions = toMTLResourseOption(info.memUsage);
-        if (_size > 0)
+//        for single-use data smaller than 4 KB, use setVertexBytes:length:atIndex: instead
+        if (_size < MINIMUMR_REQUIRED_SIZE_4KB)
         {
+            _bytes = static_cast<uint8_t*>(CC_MALLOC(_size));
+            _device->getMemoryStatus().bufferSize += _size;
+        }
+        else
+        {
+            _mtlResourceOptions = mu::toMTLResourseOption(info.memUsage);
             _mtlBuffer = [id<MTLDevice>(((CCMTLDevice*)_device)->getMTLDevice() ) newBufferWithLength:_size
                                                                                               options:_mtlResourceOptions];
             if (_mtlBuffer == nil)
@@ -72,6 +68,18 @@ bool CCMTLBuffer::initialize(const GFXBufferInfo& info)
                 CCASSERT(false, "Failed to create MTLBuffer.");
                 return false;
             }
+        }
+    }
+    else if(_usage & GFXBufferUsage::INDEX)
+    {
+        _mtlResourceOptions = mu::toMTLResourseOption(info.memUsage);
+        _mtlBuffer = [id<MTLDevice>(((CCMTLDevice*)_device)->getMTLDevice() ) newBufferWithLength:_size
+                                                                                          options:_mtlResourceOptions];
+        if (_mtlBuffer == nil)
+        {
+            _status = GFXStatus::FAILED;
+            CCASSERT(false, "Failed to create MTLBuffer.");
+            return false;
         }
     }
     else if (_usage & GFXBufferUsageBit::INDIRECT)
@@ -122,6 +130,13 @@ void CCMTLBuffer::destroy()
         _device->getMemoryStatus().bufferSize -= _size;
         _buffer = nullptr;
     }
+    
+    if(_bytes)
+    {
+        CC_FREE(_bytes);
+        _device->getMemoryStatus().bufferSize -= _size;
+        _bytes = nullptr;
+    }
     _status = GFXStatus::UNREADY;
 }
 
@@ -134,15 +149,18 @@ void CCMTLBuffer::resize(uint size)
         _usage & GFXBufferUsage::INDEX ||
         _usage & GFXBufferUsage::UNIFORM)
     {
-        if (_mtlBuffer) [_mtlBuffer release];
-        
-        _mtlBuffer = [id<MTLDevice>(((CCMTLDevice*)_device)->getMTLDevice() ) newBufferWithLength:size
-                                                                                          options:_mtlResourceOptions];
-        if (!_mtlBuffer)
+        if (_mtlBuffer)
         {
-            _status = GFXStatus::FAILED;
-            CC_LOG_ERROR("Failed to resize buffer for metal buffer.");
-            return;
+            [_mtlBuffer release];
+        
+            _mtlBuffer = [id<MTLDevice>(((CCMTLDevice*)_device)->getMTLDevice() ) newBufferWithLength:size
+                                                                                              options:_mtlResourceOptions];
+            if (!_mtlBuffer)
+            {
+                _status = GFXStatus::FAILED;
+                CC_LOG_ERROR("Failed to resize buffer for metal buffer.");
+                return;
+            }
         }
     }
     
@@ -151,6 +169,7 @@ void CCMTLBuffer::resize(uint size)
     _count = _size / _stride;
     resizeBuffer(&_transferBuffer, _size, oldSize);
     resizeBuffer(&_buffer, _size, oldSize);
+    resizeBuffer(&_bytes, _size, oldSize);
     _indirects.resize(_count);
     _status = GFXStatus::SUCCESS;
 }
@@ -192,10 +211,22 @@ void CCMTLBuffer::update(void* buffer, uint offset, uint size)
         return;
     }
 
+    if(_bytes)
+    {
+        memcpy(_bytes + offset, buffer, size);
+    }
+    
     if(_mtlBuffer)
     {
-        uint8_t* dst = (uint8_t*)(_mtlBuffer.contents) + offset;
-        memcpy(dst, buffer, size);
+        if(_mtlResourceOptions == MTLResourceStorageModePrivate)
+        {
+            static_cast<CCMTLDevice*>(_device)->blitBuffer(buffer, offset, size, _mtlBuffer);
+        }
+        else
+        {
+            uint8_t* dst = (uint8_t*)(_mtlBuffer.contents) + offset;
+            memcpy(dst, buffer, size);
+        }
         return;
     }
     

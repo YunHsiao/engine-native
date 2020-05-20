@@ -20,6 +20,7 @@ public:
     CC_INLINE uint8_t* getTransferBuffer() const { return _transferBuffer; }
     CC_INLINE MTLIndexType getIndexType() const { return _indexType; }
     CC_INLINE const GFXDrawInfoList& getIndirects() const { return _indirects; }
+    CC_INLINE uint8_t* getBytes() const { return _bytes; }
     
 private:
     void resizeBuffer(uint8_t**, uint, uint);
@@ -29,6 +30,9 @@ private:
     MTLIndexType _indexType = MTLIndexTypeUInt16;
     MTLResourceOptions _mtlResourceOptions = MTLResourceStorageModePrivate;
     GFXDrawInfoList _indirects;
+    
+    // to store vertex and ubo data when size is small, otherwise use MTLBuffer instead.
+    uint8_t* _bytes = nullptr;
 };
 
 NS_CC_END

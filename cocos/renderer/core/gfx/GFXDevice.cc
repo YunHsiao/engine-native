@@ -11,14 +11,4 @@ GFXDevice::GFXDevice()
 GFXDevice::~GFXDevice() {
 }
 
-GFXFormat GFXDevice::getColorFormat() const
-{
-    return _context->getColorFormat();
-}
-
-GFXFormat GFXDevice::getDepthStencilFormat() const
-{
-    return _context->getDepthStencilFormat();
-}
-
 NS_CC_END

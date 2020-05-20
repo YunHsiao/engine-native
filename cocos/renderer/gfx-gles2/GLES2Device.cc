@@ -51,7 +51,8 @@ bool GLES2Device::initialize(const GFXDeviceInfo& info)
         destroy();
         return false;
     }
-
+    _colorFmt = _context->getColorFormat();
+    _depthStencilFmt = _context->getDepthStencilFormat();
     String extStr = (const char*)glGetString(GL_EXTENSIONS);
     _extensions = StringUtil::Split(extStr, " ");
 

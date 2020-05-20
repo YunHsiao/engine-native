@@ -88,8 +88,7 @@ void CCMTLCommandBuffer::beginRenderPass(GFXFramebuffer* fbo, const GFXRect& ren
     cmd->renderArea = render_area;
     cmd->clearStencil = stencil;
     cmd->clearDepth = depth;
-    for (uint i = 0; i < colors.size(); ++i)
-        cmd->clearColors[i] = colors[i];
+    cmd->clearColors = colors;
     
     _commandPackage->beginRenderPassCmds.push(cmd);
     _commandPackage->commandTypes.push(GFXCmdType::BEGIN_RENDER_PASS);
@@ -324,10 +323,12 @@ void CCMTLCommandBuffer::bindStates()
     commandBindState->blendConstants = _currentBlendConstants;
     commandBindState->depthBounds = *_currentDepthBounds;
     
-    if ( (commandBindState->viewportDirty = _isViewportDirty) )
+    commandBindState->viewportDirty = _isViewportDirty;
+    if (_isViewportDirty)
         commandBindState->viewport = mu::toMTLViewport(_currentViewport);
     
-    if ( (commandBindState->scissorDirty = _isScissorDirty) )
+    commandBindState->scissorDirty = _isScissorDirty;
+    if (_isScissorDirty)
         commandBindState->scissorRect = mu::toMTLScissorRect(_currentScissor);
     
     commandBindState->pipelineState = _currentPipelineState;
