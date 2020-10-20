@@ -18,7 +18,7 @@ constexpr uint ALLOW_VALIDATION_ERRORS = 0;         // 0 for default behavior, o
 constexpr uint PREFERRED_SWAPCHAIN_IMAGE_COUNT = 0; // 0 for default count, otherwise prefer the specified number
 
 #define FORCE_ENABLE_VALIDATION 0
-#define FORCE_DISABLE_VALIDATION 0
+#define FORCE_DISABLE_VALIDATION 1
 
 #if CC_DEBUG > 0 && !FORCE_DISABLE_VALIDATION || FORCE_ENABLE_VALIDATION
 VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
