@@ -485,7 +485,7 @@ bool CCVKContext::initialize(const ContextInfo &info) {
         }
 
         // Determine the number of images
-        uint desiredNumberOfSwapchainImages = surfaceCapabilities.minImageCount + 1;
+        uint desiredNumberOfSwapchainImages = std::max(3u, surfaceCapabilities.minImageCount + 1);
         if (PREFERRED_SWAPCHAIN_IMAGE_COUNT) {
             desiredNumberOfSwapchainImages = PREFERRED_SWAPCHAIN_IMAGE_COUNT;
         }

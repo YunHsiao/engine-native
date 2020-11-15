@@ -30,7 +30,6 @@ bool CCVKCommandBuffer::initialize(const CommandBufferInfo &info) {
     _gpuCommandBuffer = CC_NEW(CCVKGPUCommandBuffer);
     _gpuCommandBuffer->level = MapVkCommandBufferLevel(_type);
     _gpuCommandBuffer->queueFamilyIndex = ((CCVKQueue *)_queue)->gpuQueue()->queueFamilyIndex;
-    ((CCVKDevice *)_device)->gpuCommandBufferPool()->request(_gpuCommandBuffer);
 
     uint setCount = ((CCVKDevice *)_device)->bindingMappingInfo().bufferOffsets.size();
     _curGPUDescriptorSets.resize(setCount);
@@ -49,6 +48,10 @@ void CCVKCommandBuffer::destroy() {
 
 void CCVKCommandBuffer::begin(RenderPass *renderPass, uint subpass, Framebuffer *frameBuffer) {
     if (_gpuCommandBuffer->began) return;
+
+    CCVKGPUCommandBufferPool *pool = ((CCVKDevice *)_device)->gpuCommandBufferPool();
+    pool->yield(_gpuCommandBuffer);
+    pool->request(_gpuCommandBuffer);
 
     _curGPUPipelineState = nullptr;
     _curGPUInputAssember = nullptr;
@@ -76,6 +79,7 @@ void CCVKCommandBuffer::begin(RenderPass *renderPass, uint subpass, Framebuffer 
         if (frameBuffer) inheritanceInfo.framebuffer = ((CCVKFramebuffer *)frameBuffer)->gpuFBO()->vkFramebuffer;
         beginInfo.pInheritanceInfo = &inheritanceInfo;
     }
+
     VK_CHECK(vkBeginCommandBuffer(_gpuCommandBuffer->vkCommandBuffer, &beginInfo));
 
     _gpuCommandBuffer->began = true;
@@ -167,7 +171,10 @@ void CCVKCommandBuffer::bindDescriptorSet(uint set, DescriptorSet *descriptorSet
 
     if (_curGPUDescriptorSets[set] != gpuDescriptorSet) {
         _curGPUDescriptorSets[set] = gpuDescriptorSet;
-        if (set < _firstDirtyDescriptorSet) _firstDirtyDescriptorSet = set;
+        if (set < _firstDirtyDescriptorSet) {
+            _firstDirtyDescriptorSet = set;
+            _firstDifferentDescriptorSet = set;
+        }
     }
     if (dynamicOffsetCount) {
         _curDynamicOffsets[set].assign(dynamicOffsets, dynamicOffsets + dynamicOffsetCount);
@@ -388,49 +395,57 @@ void CCVKCommandBuffer::bindDescriptorSets() {
 
     CCVKDevice *device = (CCVKDevice *)_device;
     CCVKGPUDevice *gpuDevice = device->gpuDevice();
-    VkCommandBuffer cmdBuff = _gpuCommandBuffer->vkCommandBuffer;
     CCVKGPUPipelineLayout *pipelineLayout = _curGPUPipelineState->gpuPipelineLayout;
+    vector<VkDescriptorSet> &sets = _curGPUPipelineState->gpuPipelineLayout->descriptorSets;
+
+    if (_firstDifferentDescriptorSet < _curGPUDescriptorSets.size()) {
+        uint differentDescriptorSetCount = _curGPUDescriptorSets.size() - _firstDifferentDescriptorSet;
+        const vector<VkDescriptorSetLayout> &layouts = _curGPUPipelineState->gpuPipelineLayout->descriptorSetLayouts;
+        device->gpuDescriptorSetPool()->alloc(layouts.data() + _firstDifferentDescriptorSet,
+                                              sets.data() + _firstDifferentDescriptorSet,
+                                              differentDescriptorSetCount);
+
+        for (uint i = 0u; i < differentDescriptorSetCount; i++) {
+            uint set = _firstDifferentDescriptorSet + i;
+            CCVKGPUDescriptorSet *gpuDescriptorSet = _curGPUDescriptorSets[set];
+            if (!gpuDescriptorSet || !gpuDescriptorSet->gpuDescriptors.size()) continue;
+
+            if (gpuDevice->useDescriptorUpdateTemplate) {
+                const vector<CCVKDescriptorInfo> &descriptorInfos = gpuDescriptorSet->descriptorInfos;
+                const vector<VkDescriptorUpdateTemplate> &templates = pipelineLayout->vkDescriptorUpdateTemplates;
+                vkUpdateDescriptorSetWithTemplateKHR(gpuDevice->vkDevice, sets[set], templates[set], descriptorInfos.data());
+            } else {
+                vector<VkWriteDescriptorSet> &entries = gpuDescriptorSet->descriptorUpdateEntries;
+
+                for (uint j = 0u; j < entries.size(); j++) {
+                    entries[j].dstSet = sets[set];
+                }
+                vkUpdateDescriptorSets(gpuDevice->vkDevice, entries.size(), entries.data(), 0, nullptr);
+            }
+        }
+    }
+
     uint dirtyDescriptorSetCount = _curGPUDescriptorSets.size() - _firstDirtyDescriptorSet;
     uint dynamicOffsetStartIndex = pipelineLayout->dynamicOffsetOffsets[_firstDirtyDescriptorSet];
     uint dynamicOffsetCount = pipelineLayout->dynamicOffsetCount - dynamicOffsetStartIndex;
     uint *dynamicOffsets = pipelineLayout->dynamicOffsets.data() + dynamicOffsetStartIndex;
-
-    const vector<VkDescriptorSetLayout> &layouts = _curGPUPipelineState->gpuPipelineLayout->descriptorSetLayouts;
-    vector<VkDescriptorSet> &sets = _curGPUPipelineState->gpuPipelineLayout->descriptorSets;
-    device->gpuDescriptorSetPool()->alloc(layouts.data() + _firstDirtyDescriptorSet,
-                                          sets.data() + _firstDirtyDescriptorSet,
-                                          dirtyDescriptorSetCount);
-
-    for (uint i = 0u, offsetAcc = 0u; i < dirtyDescriptorSetCount; i++) {
-        uint set = _firstDirtyDescriptorSet + i;
-        CCVKGPUDescriptorSet *gpuDescriptorSet = _curGPUDescriptorSets[set];
-        if (!gpuDescriptorSet || !gpuDescriptorSet->gpuDescriptors.size()) continue;
-
-        if (gpuDevice->useDescriptorUpdateTemplate) {
-            const vector<CCVKDescriptorInfo> &descriptorInfos = gpuDescriptorSet->descriptorInfos;
-            const vector<VkDescriptorUpdateTemplate> &templates = pipelineLayout->vkDescriptorUpdateTemplates;
-            vkUpdateDescriptorSetWithTemplateKHR(device->gpuDevice()->vkDevice, sets[set], templates[set], descriptorInfos.data());
-        } else {
-            vector<VkWriteDescriptorSet> &entries = gpuDescriptorSet->descriptorUpdateEntries;
-
-            for (uint j = 0u; j < entries.size(); j++) {
-                entries[j].dstSet = sets[set];
+    if (_firstDirtyDescriptorSet < _curGPUDescriptorSets.size()) {
+        for (uint i = 0u, offsetAcc = 0u; i < dirtyDescriptorSetCount; i++) {
+            uint set = _firstDirtyDescriptorSet + i;
+            uint offsetCount = pipelineLayout->dynamicOffsetOffsets[set + 1] - dynamicOffsetStartIndex;
+            if (_curDynamicOffsets[set].size() && offsetCount > 0) {
+                memcpy(dynamicOffsets + offsetAcc, _curDynamicOffsets[set].data(), offsetCount * sizeof(uint));
+                offsetAcc += offsetCount;
             }
-            vkUpdateDescriptorSets(device->gpuDevice()->vkDevice, entries.size(), entries.data(), 0, nullptr);
-        }
-
-        uint offsetCount = pipelineLayout->dynamicOffsetOffsets[set + 1] - dynamicOffsetStartIndex;
-        if (_curDynamicOffsets[set].size() && offsetCount > 0) {
-            memcpy(dynamicOffsets + offsetAcc, _curDynamicOffsets[set].data(), offsetCount * sizeof(uint));
-            offsetAcc += offsetCount;
         }
     }
 
-    vkCmdBindDescriptorSets(cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout->vkPipelineLayout,
+    vkCmdBindDescriptorSets(_gpuCommandBuffer->vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout->vkPipelineLayout,
                             _firstDirtyDescriptorSet, dirtyDescriptorSetCount, sets.data() + _firstDirtyDescriptorSet,
                             dynamicOffsetCount, dynamicOffsets);
 
     _firstDirtyDescriptorSet = UINT_MAX;
+    _firstDifferentDescriptorSet = UINT_MAX;
 }
 
 } // namespace gfx

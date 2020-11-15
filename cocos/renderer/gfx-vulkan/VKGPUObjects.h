@@ -2,6 +2,7 @@
 #define CC_GFXVULKAN_GPU_OBJECTS_H_
 
 #include "VKUtils.h"
+#include "vulkan/vulkan_core.h"
 
 namespace cc {
 namespace gfx {
@@ -170,7 +171,6 @@ public:
     VkSemaphore nextSignalSemaphore = VK_NULL_HANDLE;
     VkPipelineStageFlags submitStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     CachedArray<VkCommandBuffer> commandBuffers;
-    vector<VkFence> fences;
 };
 
 struct CCVKGPUShaderStage {
@@ -293,47 +293,65 @@ public:
  */
 class CCVKGPUFencePool : public Object {
 public:
-    CCVKGPUFencePool(CCVKGPUDevice *device)
+    CCVKGPUFencePool(CCVKGPUDevice *device, CCVKGPUSwapchain *gpuSwapchain)
     : _device(device) {
+        uint poolCount = gpuSwapchain->swapchainImages.size();
+        _counts.resize(poolCount);
+        _pools.resize(poolCount);
+        _gpuSwapchain = gpuSwapchain;
     }
 
     ~CCVKGPUFencePool() {
-        for (VkFence fence : _fences) {
-            vkDestroyFence(_device->vkDevice, fence, nullptr);
+        for (const vector<VkFence> &fencePool : _pools) {
+            for (VkFence fence : fencePool) {
+                vkDestroyFence(_device->vkDevice, fence, nullptr);
+            }
         }
-        _fences.clear();
-        _count = 0;
+        _pools.clear();
+        _counts.clear();
     }
 
     VkFence alloc() {
-        if (_count < _fences.size()) {
-            return _fences[_count++];
+        uint index = _gpuSwapchain->curImageIndex;
+        uint &count = _counts[index];
+        vector<VkFence> &pool = _pools[index];
+
+        if (count < pool.size()) {
+            return pool[count++];
         }
 
         VkFence fence = VK_NULL_HANDLE;
         VkFenceCreateInfo createInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
         VK_CHECK(vkCreateFence(_device->vkDevice, &createInfo, nullptr, &fence));
-        _fences.push_back(fence);
-        _count++;
+        pool.push_back(fence);
+        count++;
 
         return fence;
     }
 
     void reset() {
-        if (_count) {
-            VK_CHECK(vkResetFences(_device->vkDevice, _count, _fences.data()));
-            _count = 0;
+        uint index = _gpuSwapchain->curImageIndex;
+        uint &count = _counts[index];
+        vector<VkFence> &pool = _pools[index];
+
+        if (count) {
+            VK_CHECK(vkResetFences(_device->vkDevice, count, pool.data()));
+            count = 0;
         }
     }
 
-    uint size() {
-        return _count;
+    CC_INLINE const VkFence *getFences() const {
+        return _pools[_gpuSwapchain->curImageIndex].data();
+    }
+    CC_INLINE const uint getFenceCount() const {
+        return _counts[_gpuSwapchain->curImageIndex];
     }
 
 private:
     CCVKGPUDevice *_device;
-    uint _count = 0u;
-    vector<VkFence> _fences;
+    CCVKGPUSwapchain *_gpuSwapchain;
+    vector<uint> _counts;
+    vector<vector<VkFence>> _pools;
 };
 
 /**
@@ -386,31 +404,42 @@ private:
  */
 class CCVKGPUDescriptorSetPool : public Object {
 public:
-    CCVKGPUDescriptorSetPool(CCVKGPUDevice *device)
+    CCVKGPUDescriptorSetPool(CCVKGPUDevice *device, CCVKGPUSwapchain *gpuSwapchain)
     : _device(device) {
+        uint poolCount = gpuSwapchain->swapchainImages.size();
+        _pools.resize(poolCount);
+        _counts.resize(poolCount);
+        _gpuSwapchain = gpuSwapchain;
     }
 
     ~CCVKGPUDescriptorSetPool() {
-        for (VkDescriptorPool pool : _pools) {
-            vkDestroyDescriptorPool(_device->vkDevice, pool, nullptr);
+        for (vector<VkDescriptorPool> &pools : _pools) {
+            for (VkDescriptorPool pool : pools) {
+                vkDestroyDescriptorPool(_device->vkDevice, pool, nullptr);
+            }
+            pools.clear();
         }
         _pools.clear();
         _counts.clear();
     }
 
     void alloc(const VkDescriptorSetLayout *layouts, VkDescriptorSet *output, uint count) {
+        uint index = _gpuSwapchain->curImageIndex;
+        vector<VkDescriptorPool> &pools = _pools[index];
+        vector<uint> &counts = _counts[index];
+
         VkDescriptorSetAllocateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
         info.pSetLayouts = layouts;
         info.descriptorSetCount = count;
 
-        size_t size = _pools.size();
+        size_t size = pools.size();
         uint idx = 0u;
         for (; idx < size; idx++) {
-            if (_counts[idx] + count <= 128) {
-                info.descriptorPool = _pools[idx];
+            if (counts[idx] + count <= 128) {
+                info.descriptorPool = pools[idx];
                 VkResult res = vkAllocateDescriptorSets(_device->vkDevice, &info, output);
                 if (res) continue;
-                _counts[idx] += count;
+                counts[idx] += count;
                 return;
             }
         }
@@ -429,29 +458,34 @@ public:
 
             VkDescriptorPool descriptorPool;
             VK_CHECK(vkCreateDescriptorPool(_device->vkDevice, &createInfo, nullptr, &descriptorPool));
-            _pools.push_back(descriptorPool);
-            _counts.push_back(0);
+            pools.push_back(descriptorPool);
+            counts.push_back(0);
         }
 
-        info.descriptorPool = _pools[idx];
+        info.descriptorPool = pools[idx];
         VK_CHECK(vkAllocateDescriptorSets(_device->vkDevice, &info, output));
-        _counts[idx] += count;
+        counts[idx] += count;
     }
 
     void reset() {
-        size_t size = _pools.size();
+        uint index = _gpuSwapchain->curImageIndex;
+        vector<VkDescriptorPool> &pools = _pools[index];
+        vector<uint> &counts = _counts[index];
+
+        size_t size = pools.size();
         for (uint i = 0u; i < size; i++) {
-            if (_counts[i]) {
-                VK_CHECK(vkResetDescriptorPool(_device->vkDevice, _pools[i], 0));
-                _counts[i] = 0;
+            if (counts[i]) {
+                VK_CHECK(vkResetDescriptorPool(_device->vkDevice, pools[i], 0));
+                counts[i] = 0;
             }
         }
     }
 
 private:
     CCVKGPUDevice *_device;
-    vector<VkDescriptorPool> _pools;
-    vector<uint> _counts;
+    CCVKGPUSwapchain *_gpuSwapchain;
+    vector<vector<VkDescriptorPool>> _pools;
+    vector<vector<uint>> _counts;
 };
 
 /**
@@ -459,31 +493,39 @@ private:
  */
 class CCVKGPUCommandBufferPool : public Object {
 public:
-    CCVKGPUCommandBufferPool(CCVKGPUDevice *device)
+    CCVKGPUCommandBufferPool(CCVKGPUDevice *device, CCVKGPUSwapchain *gpuSwapchain)
     : _device(device) {
+        _pools.resize(gpuSwapchain->swapchainImages.size());
+        _gpuSwapchain = gpuSwapchain;
     }
 
     ~CCVKGPUCommandBufferPool() {
-        for (map<uint, CommandBufferPool>::iterator it = _pools.begin(); it != _pools.end(); it++) {
-            CommandBufferPool &pool = it->second;
-            if (pool.vkCommandPool != VK_NULL_HANDLE) {
-                vkDestroyCommandPool(_device->vkDevice, pool.vkCommandPool, nullptr);
-                pool.vkCommandPool = VK_NULL_HANDLE;
+        for (map<uint, CommandBufferPool> &pools : _pools) {
+            for (map<uint, CommandBufferPool>::iterator it = pools.begin(); it != pools.end(); it++) {
+                CommandBufferPool &pool = it->second;
+                if (pool.vkCommandPool != VK_NULL_HANDLE) {
+                    vkDestroyCommandPool(_device->vkDevice, pool.vkCommandPool, nullptr);
+                    pool.vkCommandPool = VK_NULL_HANDLE;
+                }
+                pool.usedCommandBuffers->clear();
+                pool.commandBuffers->clear();
             }
-            pool.usedCommandBuffers->clear();
-            pool.commandBuffers->clear();
+            pools.clear();
         }
         _pools.clear();
     }
 
     void request(CCVKGPUCommandBuffer *gpuCommandBuffer) {
-        if (!_pools.count(gpuCommandBuffer->queueFamilyIndex)) {
+        uint index = _gpuSwapchain->curImageIndex;
+        map<uint, CommandBufferPool> &pools = _pools[index];
+
+        if (!pools.count(gpuCommandBuffer->queueFamilyIndex)) {
             VkCommandPoolCreateInfo createInfo{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
             createInfo.queueFamilyIndex = gpuCommandBuffer->queueFamilyIndex;
             createInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-            VK_CHECK(vkCreateCommandPool(_device->vkDevice, &createInfo, nullptr, &_pools[gpuCommandBuffer->queueFamilyIndex].vkCommandPool));
+            VK_CHECK(vkCreateCommandPool(_device->vkDevice, &createInfo, nullptr, &pools[gpuCommandBuffer->queueFamilyIndex].vkCommandPool));
         }
-        CommandBufferPool &pool = _pools[gpuCommandBuffer->queueFamilyIndex];
+        CommandBufferPool &pool = pools[gpuCommandBuffer->queueFamilyIndex];
 
         CachedArray<VkCommandBuffer> &availableList = pool.commandBuffers[gpuCommandBuffer->level];
         if (availableList.size()) {
@@ -498,16 +540,22 @@ public:
     }
 
     void yield(CCVKGPUCommandBuffer *gpuCommandBuffer) {
+        uint index = _gpuSwapchain->curImageIndex;
+        map<uint, CommandBufferPool> &pools = _pools[index];
+
         if (gpuCommandBuffer->vkCommandBuffer) {
-            if (!_pools.count(gpuCommandBuffer->queueFamilyIndex)) return;
-            CommandBufferPool &pool = _pools[gpuCommandBuffer->queueFamilyIndex];
+            if (!pools.count(gpuCommandBuffer->queueFamilyIndex)) return;
+            CommandBufferPool &pool = pools[gpuCommandBuffer->queueFamilyIndex];
             pool.usedCommandBuffers[gpuCommandBuffer->level].push(gpuCommandBuffer->vkCommandBuffer);
             gpuCommandBuffer->vkCommandBuffer = VK_NULL_HANDLE;
         }
     }
 
     void reset() {
-        for (map<uint, CommandBufferPool>::iterator it = _pools.begin(); it != _pools.end(); it++) {
+        uint index = _gpuSwapchain->curImageIndex;
+        map<uint, CommandBufferPool> &pools = _pools[index];
+
+        for (map<uint, CommandBufferPool>::iterator it = pools.begin(); it != pools.end(); it++) {
             CommandBufferPool &pool = it->second;
             VK_CHECK(vkResetCommandPool(_device->vkDevice, pool.vkCommandPool, 0));
 
@@ -527,8 +575,8 @@ private:
     };
 
     CCVKGPUDevice *_device = nullptr;
-    map<uint, CommandBufferPool> _pools;
-    vector<uint> _counts;
+    vector<map<uint, CommandBufferPool>> _pools;
+    CCVKGPUSwapchain *_gpuSwapchain;
 };
 
 /**

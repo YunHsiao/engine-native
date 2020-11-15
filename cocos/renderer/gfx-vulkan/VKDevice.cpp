@@ -287,13 +287,16 @@ bool CCVKDevice::initialize(const DeviceInfo &info) {
     queueInfo.type = QueueType::GRAPHICS;
     _queue = createQueue(queueInfo);
 
-    _gpuFencePool = CC_NEW(CCVKGPUFencePool(_gpuDevice));
+    _gpuSwapchain = CC_NEW(CCVKGPUSwapchain);
+    _gpuSwapchain->swapchainImages.resize(gpuContext->swapchainCreateInfo.minImageCount);
+
+    _gpuFencePool = CC_NEW(CCVKGPUFencePool(_gpuDevice, _gpuSwapchain));
     _gpuRecycleBin = CC_NEW(CCVKGPURecycleBin(_gpuDevice));
     _gpuTransportHub = CC_NEW(CCVKGPUTransportHub(_gpuDevice));
     _gpuDescriptorHub = CC_NEW(CCVKGPUDescriptorHub(_gpuDevice));
     _gpuSemaphorePool = CC_NEW(CCVKGPUSemaphorePool(_gpuDevice));
-    _gpuDescriptorSetPool = CC_NEW(CCVKGPUDescriptorSetPool(_gpuDevice));
-    _gpuCommandBufferPool = CC_NEW(CCVKGPUCommandBufferPool(_gpuDevice));
+    _gpuDescriptorSetPool = CC_NEW(CCVKGPUDescriptorSetPool(_gpuDevice, _gpuSwapchain));
+    _gpuCommandBufferPool = CC_NEW(CCVKGPUCommandBufferPool(_gpuDevice, _gpuSwapchain));
     _gpuStagingBufferPool = CC_NEW(CCVKGPUStagingBufferPool(_gpuDevice));
 
     _gpuTransportHub->link(((CCVKQueue *)_queue)->gpuQueue(), _gpuFencePool, _gpuCommandBufferPool, _gpuStagingBufferPool);
@@ -335,7 +338,6 @@ bool CCVKDevice::initialize(const DeviceInfo &info) {
         _depthStencilTextures.push_back(texture);
     }
 
-    _gpuSwapchain = CC_NEW(CCVKGPUSwapchain);
     checkSwapchainStatus();
 
     ///////////////////// Print Debug Info /////////////////////
@@ -455,12 +457,6 @@ void CCVKDevice::resize(uint width, uint height) {}
 void CCVKDevice::acquire() {
     CCVKQueue *queue = (CCVKQueue *)_queue;
 
-    if (!queue->gpuQueue()->fences.empty()) {
-        VK_CHECK(vkWaitForFences(_gpuDevice->vkDevice, queue->gpuQueue()->fences.size(),
-                                 queue->gpuQueue()->fences.data(), VK_TRUE, DEFAULT_TIMEOUT));
-        queue->gpuQueue()->fences.clear();
-    }
-
     if (!checkSwapchainStatus()) return;
 
     queue->_numDrawCalls = 0;
@@ -468,6 +464,12 @@ void CCVKDevice::acquire() {
     queue->_numTriangles = 0;
     queue->gpuQueue()->nextWaitSemaphore = VK_NULL_HANDLE;
     queue->gpuQueue()->nextSignalSemaphore = VK_NULL_HANDLE;
+
+    uint fenceCount = _gpuFencePool->getFenceCount();
+    if (fenceCount) {
+        VK_CHECK(vkWaitForFences(_gpuDevice->vkDevice, fenceCount,
+                                 _gpuFencePool->getFences(), VK_TRUE, DEFAULT_TIMEOUT));
+    }
 
     // reset everything only when no pending commands
     if (_gpuTransportHub->empty() && !((CCVKCommandBuffer *)_cmdBuff)->gpuCommandBuffer()->began) {
