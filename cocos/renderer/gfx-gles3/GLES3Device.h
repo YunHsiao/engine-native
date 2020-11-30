@@ -65,6 +65,7 @@ public:
     }
 
     CC_INLINE uint getThreadID() const { return _threadID; }
+    CC_INLINE uint useVAO() const { return _useVAO; }
 
 protected:
     virtual void bindRenderContext(bool bound) override;
@@ -80,6 +81,7 @@ private:
     StringArray _extensions;
 
     uint _threadID = 0u;
+    bool _useVAO = true;
 };
 
 } // namespace gfx
