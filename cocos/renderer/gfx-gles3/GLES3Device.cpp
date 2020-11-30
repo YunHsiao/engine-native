@@ -149,6 +149,114 @@ bool GLES3Device::initialize(const DeviceInfo &info) {
 
     _gpuStateCache->initialize(_maxTextureUnits, _maxUniformBufferBindings, _maxVertexAttributes);
 
+#if (CC_PLATFORM == CC_PLATFORM_MAC_IOS)
+
+    /* *
+
+    glViewport(0, 0, _width, _height);
+    glScissor(0, 0, _width, _height);
+    _gpuStateCache->viewport.width = _gpuStateCache->scissor.width = _width;
+    _gpuStateCache->viewport.height = _gpuStateCache->scissor.height = _height;
+
+    glClearColor(1.f, 0.f, 0.f, 1.f);
+    glClearDepthf(-1.f);
+    glClearStencil(0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+     _renderContext->present();
+
+    /* *
+
+    Buffer *vb = createBuffer({
+        BufferUsageBit::VERTEX,
+        MemoryUsageBit::DEVICE,
+        sizeof(float) * 6,
+        sizeof(float) * 2,
+    });
+
+    float vbData[6]{-1.f, -1.f, 1.f, 0.f, -1.f, 1.f};
+    vb->update(vbData, 0, sizeof(vbData));
+
+    InputAssembler *ia = createInputAssembler({
+        { { "a_position", Format::RG32F } },
+        { vb },
+    });
+
+    Shader *prog = createShader({
+        "iOSInit",
+        {
+            {
+                ShaderStageFlagBit::VERTEX,
+                R"(
+                    in vec2 a_position;
+                    void main() {
+                        gl_Position = vec4(a_position, 0.0, 1.0);
+                    }
+                )"
+            },
+            {
+                ShaderStageFlagBit::FRAGMENT,
+                R"(
+                    precision mediump float;
+                    out vec4 o_color;
+                    void main() {
+                        o_color = vec4(1.0);
+                    }
+                )",
+            }
+        },
+        { { "a_id", Format::RG32F } },
+        {},
+        {}
+    });
+
+    RenderPass *rp = createRenderPass({
+        { { getColorFormat() } },
+        { getDepthStencilFormat() },
+        {}
+    });
+
+    Framebuffer *fb = createFramebuffer({ rp, {}, nullptr, {} });
+
+    PipelineLayout *pl = createPipelineLayout({
+        {}
+    });
+
+    RasterizerState rs;
+    rs.cullMode = CullMode::NONE;
+
+    DepthStencilState dss;
+    dss.depthTest = false;
+
+    PipelineState *ps = createPipelineState({
+        prog, pl, rp, {}, rs, dss, {},
+        PrimitiveMode::TRIANGLE_STRIP
+    });
+
+    Color color{ 1.f, 0.f, 0.f, 1.f };
+
+    do {
+        acquire();
+
+        _cmdBuff->begin();
+        _cmdBuff->beginRenderPass(rp, fb, { 0, 0, _width, _height }, &color, -1.f, 0);
+        _cmdBuff->bindPipelineState(ps);
+        _cmdBuff->bindInputAssembler(ia);
+        _cmdBuff->draw(ia);
+        _cmdBuff->endRenderPass();
+        _cmdBuff->end();
+
+        _queue->submit(&_cmdBuff, 1, nullptr);
+
+        present();
+
+    } while (0);
+
+    /* */
+
+
+#endif
+
     return true;
 }
 
