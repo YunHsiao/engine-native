@@ -49,20 +49,30 @@ void CCVKQueue::submit(const CommandBuffer *const *cmdBuffs, uint count, Fence *
         cmdBuffer->_gpuCommandBuffer->vkCommandBuffer = VK_NULL_HANDLE;
     }
 
-    VkSubmitInfo submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-    submitInfo.waitSemaphoreCount = _gpuQueue->nextWaitSemaphore ? 1 : 0;
-    submitInfo.pWaitSemaphores = &_gpuQueue->nextWaitSemaphore;
-    submitInfo.pWaitDstStageMask = &_gpuQueue->submitStageMask;
-    submitInfo.commandBufferCount = _gpuQueue->commandBuffers.size();
-    submitInfo.pCommandBuffers = &_gpuQueue->commandBuffers[0];
-    submitInfo.signalSemaphoreCount = _gpuQueue->nextSignalSemaphore ? 1 : 0;
-    submitInfo.pSignalSemaphores = &_gpuQueue->nextSignalSemaphore;
+    count = _gpuQueue->commandBuffers.size();
+    _gpuQueue->waitSemaphores.reserve(count);
+    _gpuQueue->waitSemaphores.clear();
+    _gpuQueue->signalSemaphores.reserve(count);
+    _gpuQueue->signalSemaphores.clear();
+    _gpuQueue->submitInfos.resize(count, {VK_STRUCTURE_TYPE_SUBMIT_INFO});
+    for (uint i = 0u; i < count; ++i) {
+        _gpuQueue->waitSemaphores.push(_gpuQueue->nextWaitSemaphore);
+        _gpuQueue->signalSemaphores.push(_gpuQueue->nextSignalSemaphore);
+        _gpuQueue->nextWaitSemaphore = _gpuQueue->nextSignalSemaphore;
+        _gpuQueue->nextSignalSemaphore = device->gpuSemaphorePool()->alloc();
+
+        VkSubmitInfo &submitInfo = _gpuQueue->submitInfos[i];
+        submitInfo.waitSemaphoreCount = _gpuQueue->waitSemaphores[i] ? 1 : 0;
+        submitInfo.pWaitSemaphores = &_gpuQueue->waitSemaphores[i];
+        submitInfo.pWaitDstStageMask = &_gpuQueue->submitStageMask;
+        submitInfo.commandBufferCount = _gpuQueue->commandBuffers[i] ? 1 : 0;
+        submitInfo.pCommandBuffers = &_gpuQueue->commandBuffers[i];
+        submitInfo.signalSemaphoreCount = _gpuQueue->signalSemaphores[i] ? 1 : 0;
+        submitInfo.pSignalSemaphores = &_gpuQueue->signalSemaphores[i];
+    }
 
     VkFence vkFence = fence ? ((CCVKFence *)fence)->gpuFence()->vkFence : device->gpuFencePool()->alloc();
-    VK_CHECK(vkQueueSubmit(_gpuQueue->vkQueue, 1, &submitInfo, vkFence));
-
-    _gpuQueue->nextWaitSemaphore = _gpuQueue->nextSignalSemaphore;
-    _gpuQueue->nextSignalSemaphore = device->gpuSemaphorePool()->alloc();
+    VK_CHECK(vkQueueSubmit(_gpuQueue->vkQueue, count, _gpuQueue->submitInfos.data(), vkFence));
 }
 
 } // namespace gfx

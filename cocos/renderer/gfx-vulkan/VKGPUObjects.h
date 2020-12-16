@@ -172,7 +172,11 @@ public:
     VkSemaphore nextWaitSemaphore = VK_NULL_HANDLE;
     VkSemaphore nextSignalSemaphore = VK_NULL_HANDLE;
     VkPipelineStageFlags submitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    
     CachedArray<VkCommandBuffer> commandBuffers;
+    CachedArray<VkSemaphore> waitSemaphores;
+    CachedArray<VkSemaphore> signalSemaphores;
+    vector<VkSubmitInfo> submitInfos;
 };
 
 struct CCVKGPUShaderStage {
