@@ -25,11 +25,11 @@
 
 #include "FrameGraph.h"
 
-#include "PassNodeBuilder.h"
-#include "Resource.h"
 #include <algorithm>
 #include <fstream>
 #include <set>
+#include "PassNodeBuilder.h"
+#include "Resource.h"
 
 namespace cc {
 namespace framegraph {
@@ -52,13 +52,13 @@ const char *FrameGraph::handleToString(const StringHandle &handle) noexcept {
 
 void FrameGraph::present(const Handle &input) noexcept {
     struct PassDataPresent {};
-    static const StringHandle sNamePresent = FrameGraph::stringToHandle("Present");
+    static const StringHandle PRESENT_NAME = FrameGraph::stringToHandle("Present");
     const ResourceNode &      resourceNode = getResourceNode(input);
     CC_ASSERT(resourceNode.writer);
 
     addPass<PassDataPresent>(
-        resourceNode.writer->_insertPoint, sNamePresent,
-        [&](PassNodeBuilder &builder, PassDataPresent &data) {
+        resourceNode.writer->_insertPoint, PRESENT_NAME,
+        [&](PassNodeBuilder &builder, PassDataPresent & /*data*/) {
             builder.read(input);
             builder.sideEffect();
         },
@@ -389,7 +389,7 @@ void FrameGraph::computeStoreActionAndMemoryless() noexcept {
 
         renderTarget->_memoryless     = renderTarget->_neverLoaded && renderTarget->_neverStored;
         renderTarget->_memorylessMSAA = textureDesc.samples != gfx::SampleCount::X1 && renderTarget->_writerCount < 2;
-        // TODO: memoryless gfx::Texture
+        // TODO(YunHsiao): memoryless gfx::Texture
     }
 }
 
@@ -425,9 +425,9 @@ void FrameGraph::generateDevicePasses() noexcept {
     }
 
     CC_ASSERT(subPassNodes.size() == 1);
-    static const StringHandle sNamePresent = FrameGraph::stringToHandle("Present");
+    static const StringHandle PRESENT_NAME = FrameGraph::stringToHandle("Present");
 
-    if (subPassNodes.back()->_name != sNamePresent) {
+    if (subPassNodes.back()->_name != PRESENT_NAME) {
         _devicePasses.emplace_back(new DevicePass(*this, subPassNodes));
 
         for (PassNode *const p : subPassNodes) {
@@ -515,14 +515,15 @@ void FrameGraph::exportGraphViz(const std::string &path) {
                 }
                 out << ", ";
                 out << (attachment->storeOp == gfx::StoreOp::DISCARD ? "DontCare" : "Store");
-                out << "\\nWriteMask: 0x" << std::hex << (uint32_t)attachment->desc.writeMask << std::dec;
+                out << "\\nWriteMask: 0x" << std::hex << static_cast<uint32_t>(attachment->desc.writeMask) << std::dec;
             } else {
                 out << "Transfer";
             }
         }
 
         out << "\", style=filled, fillcolor="
-            << ((node.virtualResource->isImported()) ? (node.virtualResource->_refCount ? "palegreen" : "palegreen4") : node.version == 0 ? "pink" : (node.virtualResource->_refCount ? "skyblue" : "skyblue4"))
+            << ((node.virtualResource->isImported()) ? (node.virtualResource->_refCount ? "palegreen" : "palegreen4") : node.version == 0 ? "pink"
+                                                                                                                                          : (node.virtualResource->_refCount ? "skyblue" : "skyblue4"))
             << "]\n";
     }
 

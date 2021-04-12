@@ -6,7 +6,7 @@ For now, **Visual Studio Code** is our first recommended IDE for the job, while 
 
 ## VS Code Integration
 
-* Make sure both `clang-tidy` and `clang-format` are directly accessible in your terminal environment, i.e. install LLVM and add the bin folder into the environment path. LLVM 11+ is recommended.
+* Make sure `clangd`, `clang-tidy` and `clang-format` are directly accessible in your terminal environment, i.e. install LLVM and add the bin folder into the environment path. LLVM 11+ is recommended.
 
     ![](imgs/LLVM.png)
 
@@ -25,11 +25,11 @@ For now, **Visual Studio Code** is our first recommended IDE for the job, while 
 
     ![](imgs/compile_commands.png)
 
-* Install both `C/C++` and `Clang-Tidy` extension from the market:
+* Install the `clangd` extension from the market:
 
-    ![](imgs/extensions.png)
+    ![](imgs/clangd.png)
 
-* If everything goes smoothly, after opening any source file, you should be able to see the `Clang-Tidy` extension's linting process and its output as warnings right inside the editor, without any errors.
+* If everything goes smoothly, after opening any source file, you should be able to see the `clangd` extension's output as warnings right inside the editor, without any errors.
 
     ![](imgs/tidy-output-editor.png)
 

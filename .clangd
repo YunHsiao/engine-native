@@ -1,0 +1,62 @@
+---
+# Here are the reasons for disabled checks:
+#
+# -misc-non-private-member-variables-in-classes
+# -modernize-avoid-c-arrays
+#       Legacy reasons
+#
+# -modernize-concat-nested-namespaces: More flexible not concated
+# -modernize-use-nodiscard: No C++17 specific rules for now
+# -modernize-use-trailing-return-type: It is acceptable to return a function call at the end of a function
+# -readability-braces-around-statements: Simple single statement can be without braces
+# -readability-function-cognitive-complexity: This will limit function size
+# -readability-implicit-bool-conversion: We omit explicit bool conversion for brevity
+# -readability-implicit-bool-cast: We omit explicit bool conversion for brevity
+# -readability-magic-numbers: There will be lots of constants
+
+Diagnostics:
+
+    ClangTidy:
+        Remove: *
+        Add: bugprone-*
+        Add: google-*
+        Add: misc-*
+        Add: modernize-*
+        Add: performance-*
+        Add: portability-*
+        Add: readability-*
+
+        Remove: misc-non-private-member-variables-in-classes
+        Remove: modernize-avoid-c-arrays
+
+        Remove: modernize-concat-nested-namespaces
+        Remove: modernize-use-nodiscard
+        Remove: modernize-use-trailing-return-type
+        Remove: readability-braces-around-statements
+        Remove: readability-function-cognitive-complexity
+        Remove: readability-implicit-bool-conversion
+        Remove: readability-implicit-bool-cast
+        Remove: readability-magic-numbers
+
+        CheckOptions:
+            readability-identifier-naming.NamespaceCase: lower_case
+            readability-identifier-naming.StructCase: CamelCase
+            readability-identifier-naming.ClassCase: CamelCase
+            readability-identifier-naming.ClassMethodCase: camelBack
+            readability-identifier-naming.ClassConstantCase: UPPER_CASE
+            readability-identifier-naming.ClassMemberCase: camelBack
+            readability-identifier-naming.ProtectedMemberPrefix: _
+            readability-identifier-naming.PrivateMemberPrefix: _
+
+            readability-identifier-naming.EnumCase: CamelCase
+            readability-identifier-naming.ScopedEnumConstantCase: UPPER_CASE
+            readability-identifier-naming.EnumConstantCase: UPPER_CASE
+
+            readability-identifier-naming.FunctionCase: camelBack
+            readability-identifier-naming.GlobalConstantCase: UPPER_CASE
+            readability-identifier-naming.LocalConstantCase: camelBack
+            readability-identifier-naming.LocalVariableCase: camelBack
+            readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
+            readability-identifier-naming.ParameterCase: camelBack
+            readability-identifier-naming.StaticConstantCase: UPPER_CASE
+            readability-identifier-naming.VariableCase: camelBack
