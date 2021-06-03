@@ -83,7 +83,6 @@ void CCVKBuffer::doDestroy() {
 
     if (_gpuBuffer) {
         if (!_isBufferView) {
-            CCVKDevice::getInstance()->gpuBufferHub()->erase(_gpuBuffer);
             CCVKDevice::getInstance()->gpuRecycleBin()->collect(_gpuBuffer);
             CCVKDevice::getInstance()->gpuBarrierManager()->cancel(_gpuBuffer);
             CC_DELETE(_gpuBuffer);
@@ -112,7 +111,7 @@ void CCVKBuffer::doResize(uint size, uint count) {
 }
 
 void CCVKBuffer::update(const void *buffer, uint size) {
-    cmdFuncCCVKUpdateBuffer(CCVKDevice::getInstance(), _gpuBuffer, buffer, size, nullptr);
+    cmdFuncCCVKUpdateBuffer(CCVKDevice::getInstance(), _gpuBufferView, buffer, size, nullptr);
 }
 
 } // namespace gfx

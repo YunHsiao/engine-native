@@ -453,8 +453,8 @@ void CCVKCommandBuffer::execute(CommandBuffer *const *cmdBuffs, uint count) {
 }
 
 void CCVKCommandBuffer::updateBuffer(Buffer *buffer, const void *data, uint size) {
-    CCVKGPUBuffer *gpuBuffer = static_cast<CCVKBuffer *>(buffer)->gpuBuffer();
-    cmdFuncCCVKUpdateBuffer(CCVKDevice::getInstance(), gpuBuffer, data, size, _gpuCommandBuffer);
+    CCVKGPUBufferView *gpuBufferView = static_cast<CCVKBuffer *>(buffer)->gpuBufferView();
+    cmdFuncCCVKUpdateBuffer(CCVKDevice::getInstance(), gpuBufferView, data, size, _gpuCommandBuffer);
 }
 
 void CCVKCommandBuffer::copyBuffersToTexture(const uint8_t *const *buffers, Texture *texture, const BufferTextureCopy *regions, uint count) {
@@ -521,8 +521,6 @@ void CCVKCommandBuffer::blitTexture(Texture *srcTexture, Texture *dstTexture, co
 }
 
 void CCVKCommandBuffer::bindDescriptorSets(VkPipelineBindPoint bindPoint) {
-    CCVKDevice *           device               = CCVKDevice::getInstance();
-    CCVKGPUDevice *        gpuDevice            = device->gpuDevice();
     CCVKGPUPipelineLayout *pipelineLayout       = _curGPUPipelineState->gpuPipelineLayout;
     vector<uint> &         dynamicOffsetOffsets = pipelineLayout->dynamicOffsetOffsets;
     uint                   descriptorSetCount   = pipelineLayout->setLayouts.size();
@@ -531,8 +529,7 @@ void CCVKCommandBuffer::bindDescriptorSets(VkPipelineBindPoint bindPoint) {
     uint dirtyDescriptorSetCount = descriptorSetCount - _firstDirtyDescriptorSet;
     for (uint i = _firstDirtyDescriptorSet; i < descriptorSetCount; ++i) {
         if (_curGPUDescriptorSets[i]) {
-            const CCVKGPUDescriptorSet::Instance &instance = _curGPUDescriptorSets[i]->instances[gpuDevice->curBackBufferIndex];
-            _curVkDescriptorSets[i]                        = instance.vkDescriptorSet;
+            _curVkDescriptorSets[i] = _curGPUDescriptorSets[i]->vkDescriptorSet;
         } else {
             _curVkDescriptorSets[i] = pipelineLayout->setLayouts[i]->defaultDescriptorSet;
         }

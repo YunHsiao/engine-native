@@ -324,11 +324,13 @@ bool CCVKDevice::doInit(const DeviceInfo & /*info*/) {
         allocatorInfo.flags |= VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT;
         vmaVulkanFunc.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2;
         vmaVulkanFunc.vkGetImageMemoryRequirements2KHR  = vkGetImageMemoryRequirements2;
+        _gpuDevice->dsUpdateFn                          = vkUpdateDescriptorSetWithTemplate;
     } else if (checkExtension(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) &&
                checkExtension(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME)) {
         allocatorInfo.flags |= VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT;
         vmaVulkanFunc.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2KHR;
         vmaVulkanFunc.vkGetImageMemoryRequirements2KHR  = vkGetImageMemoryRequirements2KHR;
+        _gpuDevice->dsUpdateFn                          = vkUpdateDescriptorSetWithTemplateKHR;
     }
 
     allocatorInfo.pVulkanFunctions = &vmaVulkanFunc;
@@ -342,14 +344,10 @@ bool CCVKDevice::doInit(const DeviceInfo & /*info*/) {
         _gpuStagingBufferPools.push_back(CC_NEW(CCVKGPUStagingBufferPool(_gpuDevice)));
     }
 
-    _gpuBufferHub        = CC_NEW(CCVKGPUBufferHub(_gpuDevice));
-    _gpuTransportHub     = CC_NEW(CCVKGPUTransportHub(_gpuDevice, static_cast<CCVKQueue *>(_queue)->gpuQueue()));
-    _gpuDescriptorHub    = CC_NEW(CCVKGPUDescriptorHub(_gpuDevice));
-    _gpuSemaphorePool    = CC_NEW(CCVKGPUSemaphorePool(_gpuDevice));
-    _gpuBarrierManager   = CC_NEW(CCVKGPUBarrierManager(_gpuDevice));
-    _gpuDescriptorSetHub = CC_NEW(CCVKGPUDescriptorSetHub(_gpuDevice));
-
-    _gpuDescriptorHub->link(_gpuDescriptorSetHub);
+    _gpuTransportHub   = CC_NEW(CCVKGPUTransportHub(_gpuDevice, static_cast<CCVKQueue *>(_queue)->gpuQueue()));
+    _gpuDescriptorHub  = CC_NEW(CCVKGPUDescriptorHub(_gpuDevice));
+    _gpuSemaphorePool  = CC_NEW(CCVKGPUSemaphorePool(_gpuDevice));
+    _gpuBarrierManager = CC_NEW(CCVKGPUBarrierManager(_gpuDevice));
 
     cmdFuncCCVKCreateSampler(this, &_gpuDevice->defaultSampler);
 
@@ -454,12 +452,10 @@ void CCVKDevice::doDestroy() {
     CC_SAFE_DESTROY(_queue)
     CC_SAFE_DESTROY(_cmdBuff)
 
-    CC_SAFE_DELETE(_gpuBufferHub)
     CC_SAFE_DELETE(_gpuTransportHub)
     CC_SAFE_DELETE(_gpuSemaphorePool)
     CC_SAFE_DELETE(_gpuDescriptorHub)
     CC_SAFE_DELETE(_gpuBarrierManager)
-    CC_SAFE_DELETE(_gpuDescriptorSetHub)
 
     uint backBufferCount = static_cast<CCVKContext *>(_context)->gpuContext()->swapchainCreateInfo.minImageCount;
     for (uint i = 0U; i < backBufferCount; i++) {
@@ -542,9 +538,6 @@ void CCVKDevice::acquire() {
     queue->_numTriangles                   = 0;
     queue->gpuQueue()->nextWaitSemaphore   = VK_NULL_HANDLE;
     queue->gpuQueue()->nextSignalSemaphore = VK_NULL_HANDLE;
-
-    _gpuBufferHub->flush(gpuTransportHub());
-    _gpuDescriptorSetHub->flush();
 
     _gpuSemaphorePool->reset();
     VkSemaphore acquireSemaphore = _gpuSemaphorePool->alloc();

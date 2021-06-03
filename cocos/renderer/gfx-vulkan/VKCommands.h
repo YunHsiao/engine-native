@@ -46,7 +46,7 @@ CC_VULKAN_API void cmdFuncCCVKCreatePipelineLayout(CCVKDevice *device, CCVKGPUPi
 CC_VULKAN_API void cmdFuncCCVKCreateGraphicsPipelineState(CCVKDevice *device, CCVKGPUPipelineState *gpuPipelineState);
 CC_VULKAN_API void cmdFuncCCVKCreateComputePipelineState(CCVKDevice *device, CCVKGPUPipelineState *gpuPipelineState);
 
-CC_VULKAN_API void cmdFuncCCVKUpdateBuffer(CCVKDevice *device, CCVKGPUBuffer *gpuBuffer, const void *buffer, uint size, const CCVKGPUCommandBuffer *cmdBuffer = nullptr);
+CC_VULKAN_API void cmdFuncCCVKUpdateBuffer(CCVKDevice *device, CCVKGPUBufferView *gpuBufferView, const void *buffer, uint size, const CCVKGPUCommandBuffer *cmdBuffer = nullptr);
 CC_VULKAN_API void cmdFuncCCVKCopyBuffersToTexture(CCVKDevice *device, const uint8_t *const *buffers, CCVKGPUTexture *gpuTexture, const BufferTextureCopy *regions, uint count, const CCVKGPUCommandBuffer *gpuCommandBuffer);
 
 CC_VULKAN_API void cmdFuncCCVKDestroyRenderPass(CCVKGPUDevice *device, CCVKGPURenderPass *gpuRenderPass);

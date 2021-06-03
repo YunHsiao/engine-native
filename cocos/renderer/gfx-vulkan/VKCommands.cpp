@@ -39,7 +39,7 @@ namespace gfx {
 
 namespace {
 constexpr bool ENABLE_LAZY_ALLOCATION = true;
-}
+} // namespace
 
 CCVKGPUCommandBufferPool *CCVKGPUDevice::getCommandBufferPool() {
     static thread_local size_t threadID = std::hash<std::thread::id>{}(std::this_thread::get_id());
@@ -51,6 +51,14 @@ CCVKGPUCommandBufferPool *CCVKGPUDevice::getCommandBufferPool() {
 
 CCVKGPUDescriptorSetPool *CCVKGPUDevice::getDescriptorSetPool(uint layoutID) {
     return &_descriptorSetPools[layoutID];
+}
+
+void CCVKGPUDescriptorSet::update(CCVKGPUDevice *device) const {
+    if (gpuLayout->vkDescriptorUpdateTemplate) {
+        device->dsUpdateFn(device->vkDevice, vkDescriptorSet, gpuLayout->vkDescriptorUpdateTemplate, descriptorInfos.data());
+    } else {
+        vkUpdateDescriptorSets(device->vkDevice, utils::toUint(descriptorUpdateEntries.size()), descriptorUpdateEntries.data(), 0, nullptr);
+    }
 }
 
 void insertVkDynamicStates(vector<VkDynamicState> *out, const vector<DynamicStateFlagBit> &dynamicStates) {
@@ -218,14 +226,15 @@ void cmdFuncCCVKCreateBuffer(CCVKDevice *device, CCVKGPUBuffer *gpuBuffer) {
         bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
         allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
     } else if (gpuBuffer->memUsage == (MemoryUsage::HOST | MemoryUsage::DEVICE)) {
-        /*
+        /* */
         gpuBuffer->instanceSize = roundUp(gpuBuffer->size, device->getCapabilities().uboOffsetAlignment);
-        bufferInfo.size = gpuBuffer->instanceSize * device->gpuDevice()->backBufferCount;
-        allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        */
+        bufferInfo.size         = gpuBuffer->instanceSize * device->gpuDevice()->backBufferCount;
+        allocInfo.flags         = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        allocInfo.usage         = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        /* *
         bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
         allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        /* */
     }
 
     VmaAllocationInfo res;
@@ -846,8 +855,8 @@ void cmdFuncCCVKCreateGraphicsPipelineState(CCVKDevice *device, CCVKGPUPipelineS
                                        1, &createInfo, nullptr, &gpuPipelineState->vkPipeline));
 }
 
-void cmdFuncCCVKUpdateBuffer(CCVKDevice *device, CCVKGPUBuffer *gpuBuffer, const void *buffer, uint size, const CCVKGPUCommandBuffer *cmdBuffer) {
-    if (!gpuBuffer) return;
+void cmdFuncCCVKUpdateBuffer(CCVKDevice *device, CCVKGPUBufferView *gpuBufferView, const void *buffer, uint size, const CCVKGPUCommandBuffer *cmdBuffer) {
+    CCVKGPUBuffer *gpuBuffer = gpuBufferView->gpuBuffer;
 
     const void *dataToUpload = nullptr;
     size_t      sizeToUpload = 0U;
@@ -888,7 +897,10 @@ void cmdFuncCCVKUpdateBuffer(CCVKDevice *device, CCVKGPUBuffer *gpuBuffer, const
 
     // back buffer instances update command
     if (!cmdBuffer && gpuBuffer->instanceSize) {
-        device->gpuBufferHub()->record(gpuBuffer, dataToUpload, sizeToUpload);
+        gpuBuffer->instanceIdx = (gpuBuffer->instanceIdx + 1) % device->gpuDevice()->backBufferCount;
+        uint8_t *dst = gpuBuffer->mappedData + gpuBuffer->instanceIdx * gpuBuffer->instanceSize;
+        memcpy(dst, dataToUpload, sizeToUpload);
+        device->gpuDescriptorHub()->update(gpuBufferView);
         return;
     }
 
