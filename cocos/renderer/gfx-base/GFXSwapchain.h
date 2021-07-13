@@ -25,41 +25,37 @@
 
 #pragma once
 
-#include "GFXDef-common.h"
+#include "GFXTexture.h"
 
 namespace cc {
 namespace gfx {
 
-constexpr TextureUsage TEXTURE_USAGE_TRANSIENT = static_cast<TextureUsage>(
-    static_cast<uint>(TextureUsageBit::COLOR_ATTACHMENT) |
-    static_cast<uint>(TextureUsageBit::DEPTH_STENCIL_ATTACHMENT) |
-    static_cast<uint>(TextureUsageBit::INPUT_ATTACHMENT));
+class CC_DLL Swapchain : public Texture {
+public:
+    Swapchain();
+    ~Swapchain() override;
 
-constexpr DescriptorType DESCRIPTOR_BUFFER_TYPE = static_cast<DescriptorType>(
-    static_cast<uint>(DescriptorType::STORAGE_BUFFER) |
-    static_cast<uint>(DescriptorType::DYNAMIC_STORAGE_BUFFER) |
-    static_cast<uint>(DescriptorType::UNIFORM_BUFFER) |
-    static_cast<uint>(DescriptorType::DYNAMIC_UNIFORM_BUFFER));
+    void initialize(const SwapchainInfo &info);
+    void destroy();
 
-constexpr DescriptorType DESCRIPTOR_TEXTURE_TYPE = static_cast<DescriptorType>(
-    static_cast<uint>(DescriptorType::SAMPLER_TEXTURE) |
-    static_cast<uint>(DescriptorType::SAMPLER) |
-    static_cast<uint>(DescriptorType::TEXTURE) |
-    static_cast<uint>(DescriptorType::STORAGE_IMAGE) |
-    static_cast<uint>(DescriptorType::INPUT_ATTACHMENT));
+    void initialize(const TextureInfo &info)     = delete;
+    void initialize(const TextureViewInfo &info) = delete;
 
-constexpr DescriptorType DESCRIPTOR_DYNAMIC_TYPE = static_cast<DescriptorType>(
-    static_cast<uint>(DescriptorType::DYNAMIC_STORAGE_BUFFER) |
-    static_cast<uint>(DescriptorType::DYNAMIC_UNIFORM_BUFFER));
+    virtual SurfaceTransform getSurfaceTransform() const { return _transform; }
 
-constexpr uint DRAW_INFO_SIZE = 28U;
+    inline Format getDepthStencilFormat() const { return _depthStencilFormat; }
 
-extern const FormatInfo GFX_FORMAT_INFOS[];
-extern const uint       GFX_TYPE_SIZES[];
+protected:
+    void doInit(const TextureInfo &info) override {}
+    void doInit(const TextureViewInfo &info) override {}
 
-extern uint formatSize(Format format, uint width, uint height, uint depth);
+    virtual void doInit(const SwapchainInfo &info) = 0;
 
-extern uint formatSurfaceSize(Format format, uint width, uint height, uint depth, uint mips);
+    void *           _windowHandle{nullptr};
+    VsyncMode        _vsyncMode{VsyncMode::RELAXED};
+    Format           _depthStencilFormat{Format::UNKNOWN};
+    SurfaceTransform _transform{SurfaceTransform::IDENTITY};
+};
 
 } // namespace gfx
 } // namespace cc

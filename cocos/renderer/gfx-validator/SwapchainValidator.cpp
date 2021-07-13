@@ -1,5 +1,5 @@
 /****************************************************************************
- Copyright (c) 2019-2021 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2020-2021 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
@@ -25,24 +25,32 @@
 
 #include "base/CoreStd.h"
 
-#include "GFXContext.h"
+#include "SwapchainValidator.h"
+#include "ValidationUtils.h"
 
 namespace cc {
 namespace gfx {
 
-Context::Context() = default;
-
-Context::~Context() = default;
-
-bool Context::initialize(const ContextInfo& info) {
-    _vsyncMode    = info.vsyncMode;
-    _windowHandle = info.windowHandle;
-
-    return doInit(info);
+SwapchainValidator::SwapchainValidator(Swapchain *actor)
+: Agent<Swapchain>(actor) {
+    _typedID = generateObjectID<decltype(this)>();
 }
 
-void Context::destroy() {
-    doDestroy();
+SwapchainValidator::~SwapchainValidator() {
+    DeviceResourceTracker<Swapchain>::erase(this);
+    CC_SAFE_DELETE(_actor);
+}
+
+void SwapchainValidator::doInit(const SwapchainInfo &info) {
+    _actor->initialize(info);
+}
+
+void SwapchainValidator::doDestroy() {
+    _actor->destroy();
+}
+
+void SwapchainValidator::doResize(uint width, uint height, uint /*size*/) {
+    _actor->resize(width, height);
 }
 
 } // namespace gfx

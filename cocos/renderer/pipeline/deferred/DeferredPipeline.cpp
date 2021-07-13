@@ -221,7 +221,7 @@ bool DeferredPipeline::createQuadInputAssembler(gfx::Buffer **quadIB, gfx::Buffe
 
 gfx::Rect DeferredPipeline::getRenderArea(scene::Camera *camera) {
     gfx::Rect renderArea;
-    
+
     uint w = camera->window->hasOnScreenAttachments && static_cast<uint>(_device->getSurfaceTransform()) % 2 ? camera->height : camera->width;
     uint h = camera->window->hasOnScreenAttachments && static_cast<uint>(_device->getSurfaceTransform()) % 2 ? camera->width : camera->height;
 
@@ -291,7 +291,7 @@ bool DeferredPipeline::activeRenderer() {
 
     gfx::ColorAttachment color = {
         gfx::Format::RGBA16F,
-        gfx::SampleCount::X1,
+        gfx::SampleCount::ONE,
         gfx::LoadOp::CLEAR,
         gfx::StoreOp::STORE,
         {},
@@ -304,7 +304,7 @@ bool DeferredPipeline::activeRenderer() {
 
     gfx::DepthStencilAttachment depth = {
         _device->getDepthStencilFormat(),
-        gfx::SampleCount::X1,
+        gfx::SampleCount::ONE,
         gfx::LoadOp::CLEAR,
         gfx::StoreOp::STORE,
         gfx::LoadOp::CLEAR,
@@ -316,7 +316,7 @@ bool DeferredPipeline::activeRenderer() {
 
     gfx::ColorAttachment cAttch = {
         gfx::Format::RGBA8,
-        gfx::SampleCount::X1,
+        gfx::SampleCount::ONE,
         gfx::LoadOp::CLEAR,
         gfx::StoreOp::STORE,
         {},
@@ -328,7 +328,7 @@ bool DeferredPipeline::activeRenderer() {
 
     lightPass.depthStencilAttachment = {
         _device->getDepthStencilFormat(),
-        gfx::SampleCount::X1,
+        gfx::SampleCount::ONE,
         gfx::LoadOp::LOAD,
         gfx::StoreOp::DISCARD,
         gfx::LoadOp::DISCARD,

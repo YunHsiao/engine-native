@@ -1,5 +1,5 @@
 /****************************************************************************
- Copyright (c) 2019-2021 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2020-2021 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
@@ -25,20 +25,24 @@
 
 #pragma once
 
-#include "GFXBuffer.h"
-#include "GFXCommandBuffer.h"
-#include "GFXDescriptorSet.h"
-#include "GFXDescriptorSetLayout.h"
-#include "GFXDevice.h"
-#include "GFXFramebuffer.h"
-#include "GFXGlobalBarrier.h"
-#include "GFXInputAssembler.h"
-#include "GFXPipelineLayout.h"
-#include "GFXPipelineState.h"
-#include "GFXQueue.h"
-#include "GFXRenderPass.h"
-#include "GFXSampler.h"
-#include "GFXShader.h"
-#include "GFXSwapchain.h"
-#include "GFXTexture.h"
-#include "GFXTextureBarrier.h"
+#include "base/Agent.h"
+#include "gfx-base/GFXSwapchain.h"
+
+namespace cc {
+namespace gfx {
+
+class CC_DLL SwapchainValidator final : public Agent<Swapchain> {
+public:
+    explicit SwapchainValidator(Swapchain *actor);
+    ~SwapchainValidator() override;
+
+    SurfaceTransform getSurfaceTransform() const override { return _actor->getSurfaceTransform(); }
+
+protected:
+    void doInit(const SwapchainInfo &info) override;
+    void doResize(uint width, uint height, uint size) override;
+    void doDestroy() override;
+};
+
+} // namespace gfx
+} // namespace cc

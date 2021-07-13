@@ -463,12 +463,40 @@ bool js_gfx_get_deviceInstance(se::State &s) { // NOLINT(readability-identifier-
 }
 SE_BIND_PROP_GET(js_gfx_get_deviceInstance)
 
+static bool js_gfx_Swapchain_initialize(se::State &s) // NOLINT(readability-identifier-naming)
+{
+    CC_UNUSED bool ok   = true;
+    auto *         cobj = SE_THIS_OBJECT<cc::gfx::Swapchain>(s);
+    SE_PRECONDITION2(cobj, false, "js_gfx_Swapchain_initialize : Invalid Native Object");
+    const auto &args = s.args();
+    size_t      argc = args.size();
+    do {
+        if (argc == 1) {
+            HolderType<cc::gfx::SwapchainInfo, true> arg0 = {};
+
+            ok &= sevalue_to_native(args[0], &arg0, s.thisObject());
+            if (!ok) {
+                ok = true;
+                break;
+            }
+            cobj->initialize(arg0.value());
+            return true;
+        }
+    } while (false);
+
+    SE_REPORT_ERROR("wrong number of arguments: %d", (int)argc);
+    return false;
+}
+SE_BIND_FUNC(js_gfx_Swapchain_initialize)
+
 bool register_all_gfx_manual(se::Object *obj) {
     __jsb_cc_gfx_Device_proto->defineFunction("copyBuffersToTexture", _SE(js_gfx_Device_copyBuffersToTexture));
     __jsb_cc_gfx_Device_proto->defineFunction("copyTexImagesToTexture", _SE(js_gfx_Device_copyTexImagesToTexture));
 
     __jsb_cc_gfx_Device_proto->defineFunction("createBuffer", _SE(js_gfx_Device_createBuffer));
     __jsb_cc_gfx_Device_proto->defineFunction("createTexture", _SE(js_gfx_Device_createTexture));
+
+    __jsb_cc_gfx_Swapchain_proto->defineFunction("initialize", _SE(js_gfx_Swapchain_initialize));
 
     __jsb_cc_gfx_Buffer_proto->defineFunction("update", _SE(js_gfx_GFXBuffer_update));
 

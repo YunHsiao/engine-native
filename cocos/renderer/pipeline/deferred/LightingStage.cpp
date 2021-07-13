@@ -274,7 +274,7 @@ void LightingStage::activate(RenderPipeline *pipeline, RenderFlow *flow) {
 
     gfx::ColorAttachment cAttch = {
         gfx::Format::RGBA8,
-        gfx::SampleCount::X1,
+        gfx::SampleCount::ONE,
         gfx::LoadOp::LOAD,
         gfx::StoreOp::STORE,
         {gfx::AccessType::FRAGMENT_SHADER_READ_TEXTURE},
@@ -286,7 +286,7 @@ void LightingStage::activate(RenderPipeline *pipeline, RenderFlow *flow) {
 
     reflectionPassInfo.depthStencilAttachment = {
         _device->getDepthStencilFormat(),
-        gfx::SampleCount::X1,
+        gfx::SampleCount::ONE,
         gfx::LoadOp::LOAD,
         gfx::StoreOp::DISCARD,
         gfx::LoadOp::DISCARD,

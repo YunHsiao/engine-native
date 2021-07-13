@@ -1,5 +1,5 @@
 /****************************************************************************
- Copyright (c) 2019-2021 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2020-2021 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
@@ -23,22 +23,19 @@
  THE SOFTWARE.
 ****************************************************************************/
 
-#pragma once
+#include "EmptySwapchain.h"
 
-#include "GFXBuffer.h"
-#include "GFXCommandBuffer.h"
-#include "GFXDescriptorSet.h"
-#include "GFXDescriptorSetLayout.h"
-#include "GFXDevice.h"
-#include "GFXFramebuffer.h"
-#include "GFXGlobalBarrier.h"
-#include "GFXInputAssembler.h"
-#include "GFXPipelineLayout.h"
-#include "GFXPipelineState.h"
-#include "GFXQueue.h"
-#include "GFXRenderPass.h"
-#include "GFXSampler.h"
-#include "GFXShader.h"
-#include "GFXSwapchain.h"
-#include "GFXTexture.h"
-#include "GFXTextureBarrier.h"
+namespace cc {
+namespace gfx {
+
+void EmptySwapchain::doInit(const SwapchainInfo &info) {
+}
+
+void EmptySwapchain::doResize(uint width, uint height, uint size) {
+}
+
+void EmptySwapchain::doDestroy() {
+}
+
+} // namespace gfx
+} // namespace cc

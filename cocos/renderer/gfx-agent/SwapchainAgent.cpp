@@ -1,5 +1,5 @@
 /****************************************************************************
- Copyright (c) 2019-2021 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2020-2021 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
@@ -24,45 +24,60 @@
 ****************************************************************************/
 
 #include "base/CoreStd.h"
+#include "base/threading/MessageQueue.h"
 
-#include "GFXDevice.h"
-#include "GFXObject.h"
+#include "DeviceAgent.h"
+#include "SwapchainAgent.h"
 
 namespace cc {
 namespace gfx {
 
-Device *Device::instance = nullptr;
-
-Device *Device::getInstance() {
-    return Device::instance;
+SwapchainAgent::SwapchainAgent(Swapchain *actor)
+: Agent<Swapchain>(actor) {
+    _typedID = generateObjectID<decltype(this)>();
 }
 
-Device::Device() {
-    Device::instance = this;
-    _features.fill(false);
+SwapchainAgent::~SwapchainAgent() {
+    ENQUEUE_MESSAGE_1(
+        DeviceAgent::getInstance()->getMessageQueue(),
+        TextureDestruct,
+        actor, _actor,
+        {
+            CC_SAFE_DELETE(actor);
+        });
 }
 
-Device::~Device() {
-    Device::instance = nullptr;
+void SwapchainAgent::doInit(const SwapchainInfo &info) {
+    ENQUEUE_MESSAGE_2(
+        DeviceAgent::getInstance()->getMessageQueue(),
+        TextureInit,
+        actor, getActor(),
+        info, info,
+        {
+            actor->initialize(info);
+        });
 }
 
-bool Device::initialize(const DeviceInfo &info) {
-    _bindingMappingInfo = info.bindingMappingInfo;
-    if (_bindingMappingInfo.bufferOffsets.empty()) {
-        _bindingMappingInfo.bufferOffsets.push_back(0);
-    }
-    if (_bindingMappingInfo.samplerOffsets.empty()) {
-        _bindingMappingInfo.samplerOffsets.push_back(0);
-    }
-
-    return doInit(info);
+void SwapchainAgent::doResize(uint width, uint height, uint /*size*/) {
+    ENQUEUE_MESSAGE_3(
+        DeviceAgent::getInstance()->getMessageQueue(),
+        TextureResize,
+        actor, getActor(),
+        width, width,
+        height, height,
+        {
+            actor->resize(width, height);
+        });
 }
 
-void Device::destroy() {
-    doDestroy();
-
-    _bindingMappingInfo.bufferOffsets.clear();
-    _bindingMappingInfo.samplerOffsets.clear();
+void SwapchainAgent::doDestroy() {
+    ENQUEUE_MESSAGE_1(
+        DeviceAgent::getInstance()->getMessageQueue(),
+        TextureDestroy,
+        actor, getActor(),
+        {
+            actor->destroy();
+        });
 }
 
 } // namespace gfx

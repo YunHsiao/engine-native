@@ -23,22 +23,48 @@
  THE SOFTWARE.
 ****************************************************************************/
 
-#pragma once
+#include "base/CoreStd.h"
 
-#include "GFXBuffer.h"
-#include "GFXCommandBuffer.h"
-#include "GFXDescriptorSet.h"
-#include "GFXDescriptorSetLayout.h"
-#include "GFXDevice.h"
-#include "GFXFramebuffer.h"
-#include "GFXGlobalBarrier.h"
-#include "GFXInputAssembler.h"
-#include "GFXPipelineLayout.h"
-#include "GFXPipelineState.h"
-#include "GFXQueue.h"
-#include "GFXRenderPass.h"
-#include "GFXSampler.h"
-#include "GFXShader.h"
 #include "GFXSwapchain.h"
-#include "GFXTexture.h"
-#include "GFXTextureBarrier.h"
+#include "gfx-base/GFXDef-common.h"
+
+namespace cc {
+namespace gfx {
+
+Swapchain::Swapchain()
+: Texture() {
+    _objectType = ObjectType::SWAPCHAIN;
+}
+
+Swapchain::~Swapchain() = default;
+
+void Swapchain::initialize(const SwapchainInfo &info) {
+    CCASSERT(info.windowHandle, "Invalid window handle");
+
+    _windowHandle       = info.windowHandle;
+    _vsyncMode          = info.vsyncMode;
+    _depthStencilFormat = info.depthStencilFormat;
+
+    _type       = TextureType::TEX2D;
+    _usage      = TextureUsageBit::COLOR_ATTACHMENT;
+    _format     = info.format;
+    _width      = info.width;
+    _height     = info.height;
+    _depth      = 1;
+    _layerCount = 1;
+    _levelCount = 1;
+    _samples    = info.samples;
+    _flags      = TextureFlagBit::NONE;
+    _size       = formatSize(_format, _width, _height, _depth);
+
+    doInit(info);
+}
+
+void Swapchain::destroy() {
+    Texture::destroy();
+
+    _windowHandle = nullptr;
+}
+
+} // namespace gfx
+} // namespace cc
